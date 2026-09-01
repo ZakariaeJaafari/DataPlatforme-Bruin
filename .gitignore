@@ -1,0 +1,17 @@
+# Environment and secrets
+.env
+.env.*
+
+# Local databases
+*.db
+duckdb.db
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# OS
+.DS_Store
+Thumbs.db
