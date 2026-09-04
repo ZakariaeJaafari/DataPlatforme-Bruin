@@ -1,5 +1,9 @@
 # Cursor IDE (local config, not for version control)
 .cursor/
+test/
+
+# TLC parquet cache (downloaded by trips.py)
+pipeline/assets/ingestion/cache/
 
 # Environment and secrets
 .env
@@ -18,3 +22,10 @@ venv/
 # OS
 .DS_Store
 Thumbs.db
+
+.bruin.yml
+/duckdb.db
+/duckdb.db.wal
+logs/runs
+logs/*.log
+logs/queries
