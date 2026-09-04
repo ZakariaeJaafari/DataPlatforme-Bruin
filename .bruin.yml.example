@@ -1,0 +1,20 @@
+# Copy to .bruin.yml and fill in MotherDuck values for the production environment.
+# Docs: https://getbruin.com/docs/bruin/platforms/motherduck
+
+default_environment: default
+
+environments:
+  # Local development — file-based DuckDB
+  default:
+    connections:
+      duckdb:
+        - name: duckdb-default
+          path: duckdb.db
+
+  # Cloud / MotherDuck — same connection name, different backend
+  production:
+    connections:
+      motherduck:
+        - name: duckdb-default
+          token: "${MOTHERDUCK_TOKEN}"
+          database: nyc_taxi

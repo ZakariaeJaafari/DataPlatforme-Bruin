@@ -97,6 +97,7 @@ WITH filtered AS (
     AND pickup_datetime IS NOT NULL
     AND dropoff_datetime IS NOT NULL
     AND fare_amount >= 0
+    AND (trip_distance IS NULL OR trip_distance >= 0)
 ),
 enriched AS (
   SELECT

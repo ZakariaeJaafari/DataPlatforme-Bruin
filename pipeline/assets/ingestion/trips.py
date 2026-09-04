@@ -50,11 +50,14 @@ import os
 from datetime import datetime, timezone
 from pathlib import Path
 
-import pandas as pd
+import pyarrow as pa
+import pyarrow.parquet as pq
 from dateutil.relativedelta import relativedelta
 
 TLC_BASE_URL = "https://d37ci6vzurychx.cloudfront.net/trip-data"
 CACHE_DIR = Path(__file__).resolve().parent / "cache"
+# Keep each Arrow batch under Bruin's ~256 MB IPC limit (large months e.g. 2020-01).
+BATCH_SIZE = 150_000
 
 DATETIME_COLUMNS = {
     "yellow": {
@@ -67,7 +70,6 @@ DATETIME_COLUMNS = {
     },
 }
 
-# Load only columns needed downstream to keep Arrow payloads under transfer limits.
 PARQUET_COLUMNS = {
     "yellow": [
         "tpep_pickup_datetime",
@@ -92,19 +94,31 @@ PARQUET_COLUMNS = {
 }
 
 
-def load_parquet(url: str, taxi_type: str, year: int, month: int) -> pd.DataFrame:
+def ensure_cached(url: str, taxi_type: str, year: int, month: int) -> Path:
     columns = PARQUET_COLUMNS[taxi_type]
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
     cache_path = CACHE_DIR / f"{taxi_type}_tripdata_{year}-{month:02d}.parquet"
 
     if cache_path.exists():
         print(f"Using cached file: {cache_path}")
-        return pd.read_parquet(cache_path, columns=columns)
+        return cache_path
 
     print(f"Downloading: {url}")
-    df = pd.read_parquet(url, columns=columns)
-    df.to_parquet(cache_path, index=False)
-    return df
+    pq.write_table(pq.read_table(url, columns=columns), cache_path)
+    return cache_path
+
+
+def transform_batch(
+    batch: pa.RecordBatch,
+    taxi_type: str,
+    extracted_at: datetime,
+    rename_map: dict[str, str],
+) -> pa.Table:
+    df = batch.to_pandas()
+    df = df.rename(columns={k: v for k, v in rename_map.items() if k in df.columns})
+    df["taxi_type"] = taxi_type
+    df["extracted_at"] = extracted_at
+    return pa.Table.from_pandas(df, preserve_index=False)
 
 
 def materialize():
@@ -117,7 +131,6 @@ def materialize():
     end_dt = datetime.fromisoformat(end_date)
     extracted_at = datetime.now(timezone.utc)
 
-    frames = []
     current_dt = start_dt
 
     while current_dt < end_dt:
@@ -126,26 +139,33 @@ def materialize():
 
         for taxi_type in taxi_types:
             url = f"{TLC_BASE_URL}/{taxi_type}_tripdata_{year}-{month:02d}.parquet"
-            try:
-                df = load_parquet(url, taxi_type, year, month)
-            except Exception as exc:
-                print(f"Warning: failed to load {url}: {exc}")
-                continue
-
+            columns = PARQUET_COLUMNS[taxi_type]
             rename_map = {
                 **DATETIME_COLUMNS.get(taxi_type, {}),
                 "PULocationID": "pickup_location_id",
                 "DOLocationID": "dropoff_location_id",
             }
-            df = df.rename(columns={k: v for k, v in rename_map.items() if k in df.columns})
-            df["taxi_type"] = taxi_type
-            df["extracted_at"] = extracted_at
-            frames.append(df)
-            print(f"Loaded {len(df)} rows for {taxi_type} {year}-{month:02d}")
+
+            try:
+                cache_path = ensure_cached(url, taxi_type, year, month)
+                parquet_file = pq.ParquetFile(cache_path)
+                total_rows = 0
+                batch_num = 0
+
+                for batch in parquet_file.iter_batches(
+                    batch_size=BATCH_SIZE, columns=columns
+                ):
+                    batch_num += 1
+                    total_rows += batch.num_rows
+                    print(
+                        f"Yielding batch {batch_num} "
+                        f"({batch.num_rows} rows) for {taxi_type} {year}-{month:02d}"
+                    )
+                    yield transform_batch(batch, taxi_type, extracted_at, rename_map)
+
+                print(f"Loaded {total_rows} rows for {taxi_type} {year}-{month:02d}")
+            except Exception as exc:
+                print(f"Warning: failed to load {url}: {exc}")
+                continue
 
         current_dt += relativedelta(months=1)
-
-    if not frames:
-        return pd.DataFrame()
-
-    return pd.concat(frames, ignore_index=True)
