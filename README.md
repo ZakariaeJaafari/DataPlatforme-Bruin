@@ -183,15 +183,15 @@ bruin query --connection duckdb-default --environment production \
 | `staging.trips` | 2,450,940 |
 | `reports.trips_report` | 156 |
 
-### MotherDuck — January 2020, yellow (6.4M rows, 43 batches)
+### MotherDuck (`nyc_taxi`) — re-queried 8 Sep 2026
 
 | Layer | Rows |
 |-------|------|
 | `ingestion.trips` | 6,405,008 |
-| `staging.trips` | ~6.4M (after dedup + invalid row filter) |
-| `reports.trips_report` | daily aggregates |
+| `staging.trips` | 6,370,784 |
+| `reports.trips_report` | 312 |
 
-All **4 assets** and quality checks passed on both environments.
+`bruin validate ./pipeline/pipeline.yml --environment default` reported no issues (4 assets). Local DuckDB still holds the January 2022 yellow run above.
 
 ## Design Decisions
 
