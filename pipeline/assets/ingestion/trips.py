@@ -165,7 +165,9 @@ def materialize():
 
                 print(f"Loaded {total_rows} rows for {taxi_type} {year}-{month:02d}")
             except Exception as exc:
-                print(f"Warning: failed to load {url}: {exc}")
-                continue
+                raise RuntimeError(
+                    f"Failed to load {taxi_type} trips for {year}-{month:02d} "
+                    f"from {url}"
+                ) from exc
 
         current_dt += relativedelta(months=1)

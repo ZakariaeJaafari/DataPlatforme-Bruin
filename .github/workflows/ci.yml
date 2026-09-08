@@ -1,0 +1,39 @@
+name: Bruin CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: bruin-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Bruin
+        uses: bruin-data/setup-bruin@main
+        with:
+          version: "0.11.749"
+
+      - name: Configure local DuckDB environment
+        run: cp .bruin.yml.example .bruin.yml
+
+      - name: Validate pipeline and assets
+        run: bruin validate ./pipeline/pipeline.yml --environment default
+
+      - name: Run SQL asset unit tests
+        run: >-
+          bruin unit-test ./pipeline
+          --environment default
+          --start-date 2022-01-01
+          --end-date 2022-02-01
+
+      - name: Check Python asset syntax
+        run: python -m compileall -q pipeline/assets/ingestion/trips.py

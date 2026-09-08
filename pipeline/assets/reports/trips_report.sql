@@ -50,6 +50,17 @@ columns:
     checks:
       - name: non_negative
 
+unit_tests:
+  - name: aggregates_daily_trips_by_fleet_and_payment
+    inputs:
+      - asset: staging.trips
+        rows:
+          - {pickup_datetime: "2022-01-10 10:00:00", taxi_type: yellow, payment_type: 1, payment_type_name: Credit card, fare_amount: 10.0, trip_distance: 2.0}
+          - {pickup_datetime: "2022-01-10 11:00:00", taxi_type: yellow, payment_type: 1, payment_type_name: Credit card, fare_amount: 15.0, trip_distance: 3.0}
+    expected:
+      rows:
+        - {trip_date: "2022-01-10", taxi_type: yellow, payment_type: 1, payment_type_name: Credit card, trip_count: 2, total_fare_amount: 25.0, total_trip_distance: 5.0}
+
 @bruin */
 
 SELECT

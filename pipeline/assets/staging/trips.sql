@@ -87,6 +87,22 @@ custom_checks:
         HAVING COUNT(*) > 1
       )
 
+unit_tests:
+  - name: filters_invalid_rows_and_keeps_latest_duplicate
+    inputs:
+      - asset: ingestion.trips
+        rows:
+          - {pickup_datetime: "2022-01-10 10:00:00", dropoff_datetime: "2022-01-10 10:15:00", payment_type: 1, taxi_type: yellow, pickup_location_id: 1, dropoff_location_id: 2, fare_amount: 12.5, trip_distance: 3.0, passenger_count: 1, extracted_at: "2022-02-01 00:00:00"}
+          - {pickup_datetime: "2022-01-10 10:00:00", dropoff_datetime: "2022-01-10 10:15:00", payment_type: 2, taxi_type: yellow, pickup_location_id: 1, dropoff_location_id: 2, fare_amount: 12.5, trip_distance: 3.0, passenger_count: 1, extracted_at: "2022-02-02 00:00:00"}
+          - {pickup_datetime: "2022-01-11 10:00:00", dropoff_datetime: "2022-01-11 10:05:00", payment_type: 1, taxi_type: yellow, pickup_location_id: 1, dropoff_location_id: 2, fare_amount: -1.0, trip_distance: 1.0, passenger_count: 1, extracted_at: "2022-02-02 00:00:00"}
+      - asset: ingestion.payment_lookup
+        rows:
+          - {payment_type_id: 1, payment_type_name: Credit card}
+          - {payment_type_id: 2, payment_type_name: Cash}
+    expected:
+      rows:
+        - {pickup_datetime: "2022-01-10 10:00:00", dropoff_datetime: "2022-01-10 10:15:00", taxi_type: yellow, payment_type: 2, payment_type_name: Cash, pickup_location_id: 1, dropoff_location_id: 2, fare_amount: 12.5, trip_distance: 3.0, passenger_count: 1}
+
 @bruin */
 
 WITH filtered AS (

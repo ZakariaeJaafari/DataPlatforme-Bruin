@@ -26,6 +26,4 @@ Thumbs.db
 .bruin.yml
 /duckdb.db
 /duckdb.db.wal
-logs/runs
-logs/*.log
-logs/queries
+logs/

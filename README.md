@@ -1,10 +1,20 @@
 # NYC Taxi ELT Pipeline with Bruin
 
-Personal project built while following **[Data Engineering Zoomcamp](https://datatalks.club/blog/data-engineering-zoomcamp.html)** — a free, hands-on data engineering course by [DataTalks.Club](https://datatalks.club/).
+An end-to-end NYC Taxi ELT pipeline with Python ingestion, SQL
+transformations, data-quality checks, and daily reporting. The same assets run
+against local **DuckDB** or cloud **MotherDuck**.
 
-This repository implements **Module 5: Data Platforms** using [Bruin](https://getbruin.com/) — an end-to-end NYC Taxi ELT pipeline with ingestion, staging, reporting, and data quality checks. Runs locally on **DuckDB** or in the cloud on **MotherDuck**.
+[![Bruin CI](https://github.com/ZakariaeJaafari/DataPlatforme-Bruin/actions/workflows/ci.yml/badge.svg)](https://github.com/ZakariaeJaafari/DataPlatforme-Bruin/actions/workflows/ci.yml)
 
-## Course Context
+Verified on MotherDuck with **6,405,008 raw rows**, **6,370,784 staged
+rows**, and **312 daily aggregates**. The ingestion generator emits 150,000-row
+PyArrow batches so large months stay below Bruin's Arrow IPC limit.
+
+Built while following **Module 5: Data Platforms** of the
+[Data Engineering Zoomcamp](https://datatalks.club/blog/data-engineering-zoomcamp.html);
+the course origin is retained here to distinguish coursework from employment.
+
+## Context
 
 | Item | Detail |
 |------|--------|
@@ -35,6 +45,7 @@ flowchart LR
   - Caches downloaded files under `pipeline/assets/ingestion/cache/`
   - **Yields 150k-row PyArrow batches** via a generator (handles large months like 2020-01 with 6.4M+ rows)
   - Uses **`append`** materialization (duplicates handled in staging)
+  - Fails the run when a source month cannot be loaded, rather than silently publishing partial output
 
 - **`ingestion.payment_lookup`** — Seed asset that loads payment type codes from CSV
 
@@ -193,6 +204,20 @@ bruin query --connection duckdb-default --environment production \
 
 `bruin validate ./pipeline/pipeline.yml --environment default` reported no issues (4 assets). Local DuckDB still holds the January 2022 yellow run above.
 
+## Tests and CI
+
+GitHub Actions installs a pinned Bruin CLI, validates all four assets, executes
+two SQL unit tests against DuckDB, and checks the Python asset's syntax. The
+unit tests verify staging filters/deduplication and report aggregation.
+
+```bash
+bruin validate ./pipeline/pipeline.yml --environment default
+bruin unit-test ./pipeline \
+  --environment default \
+  --start-date 2022-01-01 \
+  --end-date 2022-02-01
+```
+
 ## Design Decisions
 
 1. **Append at ingestion, dedupe at staging** — raw landing zone stays simple
@@ -219,3 +244,7 @@ bruin query --connection duckdb-default --environment production \
 - [MotherDuck setup](./MOTHERDUCK_SETUP.md)
 - [Bruin MotherDuck docs](https://getbruin.com/docs/bruin/platforms/motherduck)
 - [NYC TLC Trip Record Data](https://www.nyc.gov/site/tlc/about/tlc-trip-record-data.page)
+
+## Licence
+
+MIT — see [LICENSE](LICENSE).
